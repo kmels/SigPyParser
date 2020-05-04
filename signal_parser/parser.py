@@ -316,8 +316,11 @@ def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div
         s = { 'entry': entry, 'sl': sl, 'tp': tp, 'pair': pair, 'date': d, 'sign': _type, 'username': '' }
         if purifySetup(s):
             return s
-    if "ENTRY" in tokens:
-        entry = getPriceFollowing(tokens, "ENTRY", likely_prices)
+    if "ENTRY" or 'ENTERED' in tokens:
+        if 'ENTRY' in tokens:
+            entry = getPriceFollowing(tokens, "ENTRY", likely_prices)
+        elif 'ENTERED' in tokens:
+            entry = getPriceFollowing(tokens, "ENTERED", likely_prices)
         tp = getPriceFollowing(tokens, "TP", likely_prices)
         sl = getPriceFollowing(tokens, "SL", likely_prices)
 
