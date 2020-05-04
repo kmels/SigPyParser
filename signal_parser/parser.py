@@ -10,7 +10,7 @@ from . import *
 valid_buy = lambda t,entry,sl,tp: t is "BUY" and entry > sl and tp > entry
 valid_sell = lambda t,entry,sl,tp: t is "SELL" and entry < sl and tp < entry
 
-currencies = ['AUD','CAD','CHF','EUR','GBP','JPY','NZD','USD','XAU','WTI','BTC','ZAR']
+currencies = ['AUD','CAD','CHF','EUR','GBP','JPY','NZD','USD','XAU','XAG','WTI','BTC','ZAR']
 pairs = [a+b for a in currencies[:-3] for b in currencies[:-3] if a is not b]
 pairs.extend(['WTIUSD','XAUUSD'])
 
@@ -38,7 +38,6 @@ def is_likely_price(price, _prices, pair):
     
 def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
     likely_prices = [p for p in _prices if is_likely_price(p, _prices, pair)]
-    
     #  -- Si no tiene 3 precios, verificar si tiene SL y TP
     if len(likely_prices) < 3:
         if not 'TP' in _tokens:
@@ -57,12 +56,12 @@ def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
             prices_ = [p/10 for p in prices_]
             likely_prices = [p for p in prices_ if is_likely_price(p, prices_, pair)]
             div = 100
-
+    
     setup = getValidSetup(_type, pair, _tokens, [], div, d)
     
     def mkSafeSetup(s: dict):
         if not type(s) is dict:
-            return Noise("Invalid setup")
+            return Noise("Invalid setup: ")
         s['date'] = d
         s['sign'] = _type
         s['username'] = p
@@ -76,7 +75,6 @@ def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
         setup['pair'] = 'XAUUSD' if pair == 'GOLD' else pair
 
     setup = mkSafeSetup(setup)
-    
     if not setup:
         setup = getValidSetup(_type, pair, _tokens, likely_prices, div, d)
         if type(setup) is list:

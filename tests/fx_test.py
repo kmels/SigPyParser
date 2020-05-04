@@ -1365,4 +1365,27 @@ SL❗️ 2.0807"""
         self.assertEqual([0.2, 0.6, 1.1], canonical['odds'])
         self.assertEqual([20, 50, 100], canonical['tp_pips'])
         
+    def test_226(self):
+        t = """XAGUSD SELL || 15.260
+Sl - 15.460
+Tp - 15.160
+Tp2 - 15.000
+
+Use Money Management"""
+
+        expected = Signal(15.26, 15.46, 15.16, today, "SELL", "p", "XAUUSD")
+        self.assertEqual(expected.sl_pips(), 2)
+
+        expected_tp1 = Signal(15.26, 15.46, 15.16, today, "SELL", "p", "XAGUSD")
+        expected_tp2 = Signal(15.26, 15.46, 15, today, "SELL", "p", "XAGUSD")
+        self.assertEqual(expected_tp1.sl_pips(), 20)
+        self.assertEqual(expected_tp2.sl_pips(), 20)
+        self.assertEqual(expected_tp1.tp_pips(), 10)
+        self.assertEqual(expected_tp2.tp_pips(), 26)
         
+        expected = SignalList([expected_tp1, expected_tp2])
+        self._testParser(t, expected)
+
+        expected_canonical = Signal(15.26, 15.46, [15.16, 15], today, "SELL", "p", "XAGUSD")
+        self.assertEqual(expected_canonical['odds'], expected.canonical()['odds'])
+        self.assertEqual(expected.canonical(), expected_canonical)
