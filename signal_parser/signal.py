@@ -11,7 +11,7 @@ flags = {'AUD':'au','CAD':'ca','CHF':'ch',
 flags_sym = lambda c: ":flag-%s:" % flags.get(c) if c in flags else ""
 flags_ = {'AUD': '🇦🇺','CAD':'🇨🇦','CHF':'🇨🇭',
                 'EUR':'🇪🇺','GBP':'🇬🇧','USD':'🇺🇸',
-                'JPY':'🇯🇵','NZD':'🇳🇿','XAU':'💎',
+                'JPY':'🇯🇵','NZD':'🇳🇿','XAU':'💎','XAG':'💎',
                 'WTI': '⛽️', 'BRT': '⛽️'}
 #/💰🛢
 flags_sym_ = lambda c: flags_[c] if c in flags else ""
@@ -64,12 +64,8 @@ class Signal (dict):
     def odds(self) -> float:
 
         def payoff(tp,entry):
-            if type(self['tp']) is list:
-                payout_odds = [(float(target)-float(self['entry']))/(float(self['entry'])-float(self['sl'])) for target in self['tp']]
-                return [float("%.1f" % o) for o in payout_odds]
-            else:
-                payout_odds = (float(self['tp'])-float(self['entry']))/(float(self['entry'])-float(self['sl']))
-                return float("%.1f" % payout_odds)
+            payout_odds = (float(tp)-float(self['entry']))/(float(self['entry'])-float(self['sl']))
+            return float("%.1f" % payout_odds)
 
         if type(self['tp']) is list:
             return [payoff(tp, self['entry']) for tp in self['tp']]
@@ -87,7 +83,9 @@ class Signal (dict):
         sl_pips = abs(float(self['entry'])-float(self['sl'])) * 100
         if ('XAU' in self['pair']):
             sl_pips /= 10
-        if all([not p in self['pair'] for p in ['JPY','XAU','BTC']]):
+        if ('XAG' in self['pair']):
+            sl_pips /= 1
+        if all([not p in self['pair'] for p in ['JPY','XA','BTC']]):
             sl_pips *= 100
         if any([p in self['pair'] for p in ['BTC','ZAR']]):
             sl_pips /= 100
@@ -98,15 +96,18 @@ class Signal (dict):
         def pipdist(target):
             tp_pips = abs(float(self['entry'])-float(target)) * 100
             if ('XAU' in self['pair']):
-                tp_pips /= 1000
-            if all([not p in self['pair'] for p in ['JPY','XAU','BTC']]):
+                tp_pips /= 10
+            if ('XAG' in self['pair']):
+                tp_pips /= 1
+            if all([not p in self['pair'] for p in ['JPY','XA','BTC']]):
                 tp_pips *= 100
             if any([p in self['pair'] for p in ['BTC','ZAR']]):
                 tp_pips /= 100
-            return tp_pips
+            return round(tp_pips,1)
         
         if type(self['tp']) is list:
             tp_pips = [pipdist(t) for t in self['tp']]
+            return tp_pips
         else:
             tp_pips = pipdist(self['tp'])
             return round(tp_pips,1)
@@ -249,9 +250,22 @@ class SignalList(list):
             ret_sig = copy.deepcopy(self[0])
             ret_sig['tp'] = take_profits
             ret_sig['tp_pips'] = target_pips
-
+            
             payoffs = [s['odds'] for s in self]
             ret_sig['odds'] = payoffs
+
+            precise = "%.5f"
+            mt4_date = ret_sig['date'].strftime("%Y.%m.%d %H:%M")
+            ret_sig['mt4_rep'] = ("%s %s %s "+precise+" SL "+precise+" TP %s") % (
+                mt4_date, ret_sig['pair'], ret_sig['sign'], 
+                float(ret_sig['entry']), float(ret_sig['sl']), " ".join([str(precise % t) for t in ret_sig['tp']])
+            )
+            ret_sig['hash'] = myhash(ret_sig['mt4_rep'])
+            ret_sig['unique_rep'] = ("%s %s "+precise+" SL "+precise+" TP %s") % (
+                ret_sig['pair'], ret_sig['sign'], float(ret_sig['entry']), float(ret_sig['sl']), 
+                " ".join([str(precise % t) for t in ret_sig['tp']])
+            )
+
             return ret_sig
         elif (buy_and_sell):
 
