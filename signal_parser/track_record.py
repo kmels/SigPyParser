@@ -103,7 +103,7 @@ def track_record_of_selection(signals):
 
                 if type(signal['tp']) is list:
 
-                    pips += mkpips(signal['entry'] - signal['tp'][0], signal['pair']) / fact
+                    pips += mkpips(signal['entry'] - signal['tp'][0], signal['pair'])
 
                     if len(closed_score.get('secondary_scores',[])) != len(signal['tp']):
                         print("MISSING SECONDARY SCORES ")
@@ -120,7 +120,7 @@ def track_record_of_selection(signals):
                                 print("MISSING TP PIPS: ", ssc)
 
                             #pips += ssc['signal'].get('tp_pips',0)
-                            pips += mkpips(signal['entry'] - signal['tp'][i+1], signal['pair']) / fact
+                            pips += mkpips(signal['entry'] - signal['tp'][i+1], signal['pair'])
                             nwins += 1 / fact
                             positive_streak += 1
                             payoff_ = ssc['signal']['tp_pips'] / ssc['signal']['sl_pips']
@@ -216,7 +216,7 @@ def track_record_of_selection(signals):
         'avgpayout': float("%.2f" % avgpayout),
         "geometric_avg_payout": geo_mean_payout,
 
-        'nwins': int(round(nwins,0)),
+        'nwins': round(nwins,2),
         'nlosses': nlosses,
         'nclosed': nclosed,
 
@@ -234,6 +234,9 @@ def track_record_of_selection(signals):
 
         "sharpe_ratio": round(sharpe_ratio,2),
         "gain_to_pain_ratio": round(gain_to_pain_ratio,2),
+        
+        "gain": round(gain*100,2),
+        "pain": round(pain*100,2),
 
         'max_consecutive_wins': max_consecutive_wins,
         'max_consecutive_losses': max_consecutive_losses,
