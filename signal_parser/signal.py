@@ -114,7 +114,7 @@ class Signal(dict):
         sl_pips = abs(float(self['entry'])-float(self['sl'])) * 100
         if 'XAU' in self['pair']:
             sl_pips /= 10
-        if all([not p in self['pair'] for p in ['JPY', 'XAU', 'BTC']]):
+        if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC']]):
             sl_pips *= 100
         if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN']]):
             sl_pips /= 100
@@ -126,7 +126,7 @@ class Signal(dict):
             tp_pips = abs(float(self['entry'])-float(target)) * 100
             if 'XAU' in self['pair']:
                 tp_pips /= 1000
-            if all([not p in self['pair'] for p in ['JPY', 'XAU', 'BTC']]):
+            if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC']]):
                 tp_pips *= 100
             if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN']]):
                 tp_pips /= 100

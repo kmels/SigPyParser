@@ -12,7 +12,7 @@ valid_sell = lambda t, entry, sl, tp: t is "SELL" and entry < sl and tp < entry
 
 currencies = ['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU', 'WTI', 'BTC', 'ZAR', 'MXN']
 pairs = [a+b for a in currencies[:-3] for b in currencies[:-3] if a is not b]
-pairs.extend(['WTIUSD', 'XAUUSD'])
+pairs.extend(['WTIUSD','XTIUSD','XAUUSD'])
 
 binance_cryptos = ['BNB', 'BTC', 'NEO', 'ETH', 'LTC', 'QTUM', 'EOS', 'SNT', 'BNT', 'GAS',
                    'BCH', 'BTM', 'USDT', 'HCC', 'HSR', 'OAX', 'DNT', 'MCO', 'ICN', 'ZRX',
@@ -269,13 +269,12 @@ def getValidCryptoPair(text : str) -> str:
 def getValidFXPair(text : str) -> str:
     sixletters = [t for t in text.split(" ") if len(t) is 6]
     found_pairs = [p for p in sixletters if p[:3]
-             in currencies and p[-3:] in currencies]
+             in currencies and p[-3:] in currencies or p in pairs]
     if len(found_pairs) > 0 and pairs[0] in pairs:
         return found_pairs[0]
     return Noise("Missing pair")
 
 def getValidPair(text: str) -> str:
-    
     fx = getValidFXPair(text)
     if fx and type(fx) is str:
         return fx
