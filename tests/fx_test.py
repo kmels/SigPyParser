@@ -1374,6 +1374,15 @@ SL   1.29600"""
 
         self._testCanonicalParser(txt, Signal(1.31500, 1.29600, [1.31800, 1.32200, 1.32800], today, "BUY", "p", "GBPUSD"))
 
+    def test_137(self):
+        txt = """📉 SELL XTIUSD at 58.50
+Stop Loss 58.99
+Take Profit 1 at 58.20
+Take Profit 2 at 50.00
+APPROPRIATE LOT SIZE 2% risk"""
+
+        self._testCanonicalParser(txt, Signal(58.50, 58.99, [58.20, 50.00], today, "SELL", "p", "XTIUSD"))
+
     def test_212(self):
         self._testParser("""Gbpjpy sell now 142.000
 Sl 143.000
