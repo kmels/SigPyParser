@@ -12,7 +12,7 @@ valid_sell = lambda t, entry, sl, tp: t is "SELL" and entry < sl and tp < entry
 
 currencies = ['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU', 'WTI', 'BTC', 'ZAR', 'MXN']
 pairs = [a+b for a in currencies[:-3] for b in currencies[:-3] if a is not b]
-pairs.extend(['WTIUSD','XTIUSD','XAUUSD'])
+pairs.extend(['WTIUSD','XTIUSD','XAUUSD','US30USD'])
 
 binance_cryptos = ['BNB', 'BTC', 'NEO', 'ETH', 'LTC', 'QTUM', 'EOS', 'SNT', 'BNT', 'GAS',
                    'BCH', 'BTM', 'USDT', 'HCC', 'HSR', 'OAX', 'DNT', 'MCO', 'ICN', 'ZRX',
@@ -50,9 +50,6 @@ def is_likely_price(price, _prices, pair, max_deviation = 0.2):
     
 def find_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
     likely_prices = [p for p in _prices if is_likely_price(p, _prices, pair)]
-    print(_tokens)
-    print(likely_prices)
-
     #  -- If there are less than 3 price candidates,
     #  try to recover any other price by shifting decimal prices
     div = 1
@@ -275,6 +272,10 @@ def getValidFXPair(text : str) -> str:
     return Noise("Missing pair")
 
 def getValidPair(text: str) -> str:
+
+    tokens = [t for t in text.split(" ") if t in pairs]
+    if tokens:
+        return tokens[0]
     fx = getValidFXPair(text)
     if fx and type(fx) is str:
         return fx
@@ -498,5 +499,7 @@ def normalizeText(t: str) -> str:
     t = re.sub("TP\\s+2\\s+"," TP ",t)
     t = re.sub("TP\\s+3\\s+"," TP ",t)
     t = re.sub('GOLD','XAUUSD',t)
+    t = re.sub('DOW',' US30USD ',t)
+    t = re.sub(' DJ ',' US30USD ',t)
 
     return t

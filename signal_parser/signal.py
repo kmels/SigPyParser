@@ -110,32 +110,26 @@ class Signal(dict):
         mt4_date = date.strftime("%Y.%m.%d %H:%M")
         self['mt4_rep'] = self.mt4_rep()
 
-    def sl_pips(self) -> int:
-        sl_pips = abs(float(self['entry'])-float(self['sl'])) * 100
-        if 'XAU' in self['pair']:
+    def pipdist(self, target):
+        sl_pips = abs(float(self['entry'])-float(target)) * 100
+        if any([p in self['pair'] for p in ['XAU']]):
             sl_pips /= 10
-        if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC']]):
+        if any([p in self['pair'] for p in ['US30']]):
+            sl_pips /= 100
+        if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC', 'US30']]):
             sl_pips *= 100
         if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN']]):
             sl_pips /= 100
         return round(sl_pips, 1)
 
+    def sl_pips(self) -> int:
+        return self.pipdist(self['sl'])
+
     def tp_pips(self):
-
-        def pipdist(target):
-            tp_pips = abs(float(self['entry'])-float(target)) * 100
-            if 'XAU' in self['pair']:
-                tp_pips /= 1000
-            if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC']]):
-                tp_pips *= 100
-            if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN']]):
-                tp_pips /= 100
-            return round(tp_pips, 1)
-
         if type(self['tp']) is list:
-            return [pipdist(t) for t in self['tp']]
+            return [self.pipdist(t) for t in self['tp']]
         else:
-            return pipdist(self['tp'])
+            return self.pipdist(self['tp'])
 
     def is_payout_safe(self, max_payout=25.0, min_payout=0.1,
                        max_sl_pips=500, min_sl_pips=10.0) -> bool:

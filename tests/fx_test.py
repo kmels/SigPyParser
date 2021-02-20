@@ -17,6 +17,12 @@ def _parseSignal(t: str):
 
 class TestFXParser(unittest.TestCase):
 
+    def pp(self,s):
+        if type(s) is Signal:
+            return s['unique_rep']
+        elif type(s) is SignalList:
+            return str([s['unique_rep'] for s in s])
+        return str(s)
     def _testParser(self, text,expected):
         parsedSignal = _parseSignal(text)
 
@@ -24,8 +30,8 @@ class TestFXParser(unittest.TestCase):
             self.assertEqual(
                 parsedSignal,
                 expected,
-                "\n\tEXPECTED: " + str(expected) + ".\n\tRESULT:   " +
-                str(parsedSignal)
+                "\n\tEXPECTED: " + self.pp(expected) + ".\n\tRESULT:   " +
+                self.pp(parsedSignal)
             )
         else:
             assert(type(expected) == SignalList)
@@ -1105,13 +1111,22 @@ St 76.69 (50pips)
 
 Hit tp1 +25pips :man_dancing::dancer:""", SignalList([sig1,sig2,sig3]))
 
-    # Sorry - this one should return 3, not 1.
     def disabled_test_115(self):
-        self._testParser("""#USDCHF Buy @ :point_down::point_down:
+        
+        sig1 = Signal(0.9802, 0.97, 0.9820, today, "BUY", "p", "USDCHF")
+        sig2 = Signal(0.9770, 0.97, 0.9795, today, "BUY", "p", "USDCHF")
+        sig3 = Signal(0.9720, 0.97, 0.975, today, "BUY", "p", "USDCHF")
+
+        parse_result = _parseSignal("""#USDCHF Buy @ :point_down::point_down:
 Buy1 @ 0.98020 Tp @ 0.98200
 Buy 2 @0.97700  Tp @ 0.97950
 Buy 3 @0.97200  Tp @ 0.97500
-SL @ 0.97000""", Signal(0.9802, 0.97, 0.9820, today, "BUY", "p", "USDCHF"))
+SL @ 0.97000""")
+
+        error_msg = "%s not in %s " % (self.pp(sig1), self.pp(parse_result))
+        assert sig1 in parse_result, error_msg
+        error_msg = "%s not in %s " % (self.pp(sig3), self.pp(parse_result))
+        assert sig3 in parse_result, error_msg
 
     def test_116(self):
         self._testParser("""📊 Instant Order 📊
@@ -1324,7 +1339,7 @@ tp2.. 105.11"""
 
         self._testCanonicalParser(txt, Signal(105.7, 106.31, [105.43, 105.11], today, "SELL", "p", "USDJPY"))
 
-    @pytest.mark.skip(reason="no way of currently parsing this")
+    #@pytest.mark.skip(reason="no way of currently parsing this")
     def test_133(self):
         txt = """Dow Jones buy@27779
 
@@ -1336,9 +1351,11 @@ Tp@28400.25
 
 Sl@27367.60"""
 
-        txt = """36. DJ buy limit 27200 -27150 Tp 27700-28150 sl 26950"""
+        txt2 = """36. DJ buy limit 27200 -27150 Tp 27700-28150 sl 26950"""
 
-        self._testCanonicalParser(txt, Signal(27779, 27367.60, [27987.46, 28181.32, 28400.25], today, "BUY", "p", "US30"))
+        self._testCanonicalParser(txt, Signal(27779, 27367.60, [27987.46, 28181.32, 28400.25], today, "BUY", "p", "US30USD"))
+
+        self._testCanonicalParser(txt2, Signal(27200, 26950, [27700,28150], today, "BUY", "p", "US30USD"))
     
     @pytest.mark.skip(reason="no way of currently parsing this")
     def test_134(self):
@@ -1382,6 +1399,33 @@ Take Profit 2 at 50.00
 APPROPRIATE LOT SIZE 2% risk"""
 
         self._testCanonicalParser(txt, Signal(58.50, 58.99, [58.20, 50.00], today, "SELL", "p", "XTIUSD"))
+
+    def disable_test_138(self):
+
+        txt1 = """BUY STOP = 1546.37
+TP 1 : 1547.37
+TP 2 : 1548.37
+TP 3 : 1549.37
+SL : 1543.37"""
+
+        txt2 = """SELL STOP = 1534.92
+TP 1 : 1533.92
+TP 2 : 1532.92
+TP 3 : 1531.92
+SL : 1537.92"""
+
+        buyStop = Signal(1546.37, 1543.37, [1547.37, 1548.37, 1549.37], today, "BUY", "p", "XAUUSD")
+        sellStop = Signal(1534.92, 1537.92, [1533.92, 1532.92, 1531.92], today, "SELL", "p", "XAUUSD")
+
+        self._testCanonicalParser("GOLD " + txt1, buyStop)
+        self._testCanonicalParser("GOLD " + txt2, sellStop)
+        
+        sigs = _parseSignal("GOLD " + txt1 + " " + txt2)
+        assert len(sigs) == 2
+        sigs_reps = [s['unique_rep'] for s in sigs]
+        error_msg = "%s not in %s " % (buyStop['unique_rep'], sigs_reps)
+        assert buyStop['unique_rep'] in sigs_reps
+        assert sellStop in sigs_reps
 
     def test_212(self):
         self._testParser("""Gbpjpy sell now 142.000
