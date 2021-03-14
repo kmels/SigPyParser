@@ -2,6 +2,8 @@
 
 [![build status](http://img.shields.io/travis/kmels/sigpyparser/master.svg?style=flat)](https://travis-ci.org/kmels/sigpyparser)
 
+[![codecov](https://codecov.io/gh/kmels/SigPyParser/branch/master/graph/badge.svg)](https://codecov.io/gh/kmels/SigPyParser)
+
 This is a simple library to extract market signals from providers. A signal
 consists of:
   * Pair
@@ -51,7 +53,27 @@ python3 -m unittest tests.crypto_tests.TestCryptoParser # run all crypto parser 
 python3 -m unittest tests.fx_test.TestFXParser.test_215
 ```
 
+Test coverage
+----
+
+```
+pip3 install pytest pytest-cov
+pytest --cov=./
+```
+
 Roadmap
 ----
 * Support multiple signals with multiple targets per text: pass test_115 in fx_test.py
 + Test SignalList constructor for SignalList of SignalList
+
+Deployment via ZMQ REP
+----
+
+1. Build the container in .
+
+`sudo docker build -t kmels/sigpyparser_zmqrep containers/zmq_rep`
+
+2. Run the docker
+
+`sudo docker run -P -p 10001:10001 kmels/sigpyparser_zmqrep`
+

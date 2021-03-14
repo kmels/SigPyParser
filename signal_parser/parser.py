@@ -2,50 +2,56 @@ import hashlib
 import json
 
 from datetime import datetime
-from .signal import *
-from .noise import *
+from signal_parser.signal import *
+from signal_parser.noise import *
 
-from . import *
+from signal_parser import *
 
-valid_buy = lambda t,entry,sl,tp: t is "BUY" and entry > sl and tp > entry
-valid_sell = lambda t,entry,sl,tp: t is "SELL" and entry < sl and tp < entry
+valid_buy = lambda t, entry, sl, tp: t is "BUY" and entry > sl and tp > entry
+valid_sell = lambda t, entry, sl, tp: t is "SELL" and entry < sl and tp < entry
 
-currencies = ['AUD','CAD','CHF','EUR','GBP','JPY','NZD','USD','XAU','XAG','WTI','BTC','ZAR']
+currencies = ['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU', 'WTI', 'BTC', 'ZAR', 'MXN']
 pairs = [a+b for a in currencies[:-3] for b in currencies[:-3] if a is not b]
-pairs.extend(['WTIUSD','XAUUSD'])
+pairs.extend(['WTIUSD','XTIUSD','XAUUSD','US30USD'])
 
-binance_cryptos = ['BNB','BTC','NEO','ETH','LTC','QTUM','EOS','SNT','BNT','GAS','BCH','BTM','USDT','HCC','HSR','OAX','DNT','MCO','ICN','ZRX','OMG','WTC','LRC','LLT','YOYO','TRX','STRAT','SNGLS','BQX','KNC','SNM','FUN','LINK','XVG','CTR','SALT','MDA','IOTA','SUB','IOT','ETC','MTL','MTH','ENG','AST','DASH','BTG','EVX','REQ','VIB','POWR','ARK','XRP','MOD','ENJ','STORJ','VEN','KMD','RCN','NULS','RDN','XMR','DLT','AMB','BAT','ZEC','BCPT','ARN','GVT','CDT','GXS','POE','QSP','BTS','XZC','LSK','TNT','FUEL','MANA','BCD','DGD','ADX','ADA','PPT','CMT','XLM','CND','LEND','WABI','SBTC','BCX','WAVES','TNB','GTO','ICX','OST','ELF','AION','ETF','BRD','NEBL','VIBE','LUN','CHAT','RLC','INS','IOST','STEEM','NANO','AE','VIA','BLZ','SYS','RPX','NCASH','POA','ONT','ZIL','STORM','XEM','WAN','WPR','QLC','GRS','EDO','WINGS','NAV','TRIG','APPC','PIVX','MFT','PHB','FET']
+binance_cryptos = ['BNB', 'BTC', 'NEO', 'ETH', 'LTC', 'QTUM', 'EOS', 'SNT', 'BNT', 'GAS',
+                   'BCH', 'BTM', 'USDT', 'HCC', 'HSR', 'OAX', 'DNT', 'MCO', 'ICN', 'ZRX',
+                   'OMG', 'WTC', 'LRC', 'LLT', 'YOYO', 'TRX', 'STRAT', 'SNGLS', 'BQX',
+                   'KNC', 'SNM', 'FUN', 'LINK', 'XVG', 'CTR', 'SALT', 'MDA', 'IOTA',
+                   'SUB', 'IOT', 'ETC', 'MTL', 'MTH', 'ENG', 'AST', 'DASH', 'BTG', 'EVX',
+                   'REQ', 'VIB', 'POWR', 'ARK', 'XRP', 'MOD', 'ENJ', 'STORJ', 'VEN', 'KMD',
+                   'RCN', 'NULS', 'RDN', 'XMR', 'DLT', 'AMB', 'BAT', 'ZEC', 'BCPT', 'ARN',
+                   'GVT', 'CDT', 'GXS', 'POE', 'QSP', 'BTS', 'XZC', 'LSK', 'TNT', 'FUEL',
+                   'MANA', 'BCD', 'DGD', 'ADX', 'ADA', 'PPT', 'CMT', 'XLM', 'CND', 'LEND',
+                   'WABI', 'SBTC', 'BCX', 'WAVES', 'TNB', 'GTO', 'ICX', 'OST', 'ELF',
+                   'AION', 'ETF', 'BRD', 'NEBL', 'VIBE', 'LUN', 'CHAT', 'RLC', 'INS',
+                   'IOST', 'STEEM', 'NANO', 'AE', 'VIA', 'BLZ', 'SYS', 'RPX', 'NCASH',
+                   'POA', 'ONT', 'ZIL', 'STORM', 'XEM', 'WAN', 'WPR', 'QLC', 'GRS',
+                   'EDO', 'WINGS', 'NAV', 'TRIG', 'APPC', 'PIVX', 'MFT', 'PHB', 'FET']
 
 cryptocurrencies = []
 cryptocurrencies.extend(binance_cryptos)
 crypto_pairs = [base+"/"+counter for base in cryptocurrencies for counter in cryptocurrencies if base is not counter]
 crypto_pairs.extend(['BTCUSD', 'XBTUSD'])
 
-def is_likely_price(price, _prices, pair):
+def is_likely_price(price, _prices, pair, max_deviation = 0.2):
     """
-    Returns true iff price change is less than 15% in FX
+    Returns true iff any _prices changes within a max_deviation of price
     """
     if pair in crypto_pairs:
         return True
     sims = 0
     for ref_entry in _prices:
         pct_change = ref_entry/price
-        #  -- Definition of likelyprice: within 200% reach (2 times it's value%)
-        likely = abs(1-pct_change) < 0.20 # 30 pct change 
+        likely = abs(1-pct_change) < max_deviation
         if likely:
             sims += 1
     return sims >= 3
-    
-def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
-    likely_prices = [p for p in _prices if is_likely_price(p, _prices, pair)]
-    #  -- Si no tiene 3 precios, verificar si tiene SL y TP
-    if len(likely_prices) < 3:
-        if not 'TP' in _tokens:
-            return Noise("Missing TP")
-        if not 'SL' in _tokens:
-            return Noise("Missing SL")
 
-    #  -- Si tiene menos de 3 precios, tratar de rescatar typos en puntos decimales
+def find_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
+    likely_prices = [p for p in _prices if is_likely_price(p, _prices, pair)]
+    #  -- If there are less than 3 price candidates,
+    #  try to recover any other price by shifting decimal prices
     div = 1
     if len(likely_prices) < 3:
         prices_ = [p/10 for p in _prices]
@@ -56,12 +62,14 @@ def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
             prices_ = [p/10 for p in prices_]
             likely_prices = [p for p in prices_ if is_likely_price(p, prices_, pair)]
             div = 100
-    
+
     setup = getValidSetup(_type, pair, _tokens, [], div, d)
-    
+
     def mkSafeSetup(s: dict):
         if not type(s) is dict:
-            return Noise("Invalid setup: ")
+            if type(s) is list:
+                return Noise("Could not find any valid setup.", s)
+            return s
         s['date'] = d
         s['sign'] = _type
         s['username'] = p
@@ -74,21 +82,28 @@ def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
         setup['username'] = p
         setup['pair'] = 'XAUUSD' if pair == 'GOLD' else pair
 
+    is_candidate = bool(setup)
     setup = mkSafeSetup(setup)
-    if not setup:
-        setup = getValidSetup(_type, pair, _tokens, likely_prices, div, d)
-        if type(setup) is list:
-            setup = [mkSafeSetup(s) for s in setup]
-        elif setup:
-            setup = mkSafeSetup(setup)
+
+    is_safe_candidate = bool(setup)
+    #if is_candidate and not is_safe_candidate:
+        #return setup
+    if not is_safe_candidate:
+        unsafe_setup = setup
+        fallback_setup = getValidSetup(_type, pair, _tokens, likely_prices, div, d)
+        if type(fallback_setup) is list:
+            setup = [mkSafeSetup(s) for s in fallback_setup]
+        elif fallback_setup:
+            setup = mkSafeSetup(fallback_setup)
         else:
             # no valid setups, then try:
             # remove first 'tp'  (if HTTPS is before TP)
-            new_begin = _tokens.index("TP")
-            setup = getValidSetup(_type, pair, _tokens[new_begin+1:], likely_prices, div, d)
-            if setup:
-                setup = mkSafeSetup(setup)
+            if "TP" in _tokens:
+                new_begin = _tokens.index("TP")
+                fallback_setup = getValidSetup(_type, pair, _tokens[new_begin+1:], likely_prices, div, d)
 
+                if fallback_setup:
+                    setup = mkSafeSetup(fallback_setup)
     valid_setups = []
     if setup:
         valid_setups.append(setup)
@@ -138,17 +153,19 @@ def find_valid_setups(_prices, _tokens, text, pair, _type, d: datetime, p: ""):
                 next_setup_candidate = getValidSetup(_type, pair, _tokens, [], div, d)
                 if not next_setup_candidate and len(likely_prices) > 0:
                     next_setup_candidate = getValidSetup(_type, pair, _tokens, likely_prices, div, d)
-    return valid_setups  
-        
+    if not valid_setups and setup != False:
+        return setup
+    return valid_setups
+
 def parseSignal(t: str, d: datetime = None, p: str = ""):
     """
-    Given a text with some signal, returns either Signal, SignalList or Noise. 
+    Given a text with some signal, returns either Signal, SignalList or Noise.
     """
     if t is None:
         return Noise("Empty text")
 
     # Extract date from signal in MT4 format
-    res = re.search("\d{4}\\.\d{2}\\.\\d{2} \d\d?:\d\d?", t)
+    res = re.search(r"\d{4}\.\d{2}\.\d{2} \d\d?:\d\d?", t)
     if res != None:
         start_pos = res.start()
         # Check: expiry date
@@ -156,7 +173,7 @@ def parseSignal(t: str, d: datetime = None, p: str = ""):
         if expiry:
             expiry_pos = t.upper().index('EXPIR')
             if expiry_pos > start_pos:
-                d = datetime.strptime(t[start_pos:start_pos+16], "%Y.%m.%d %H:%M")    
+                d = datetime.strptime(t[start_pos:start_pos+16], "%Y.%m.%d %H:%M")
         else:
             d = datetime.strptime(t[start_pos:start_pos+16], "%Y.%m.%d %H:%M")
 
@@ -168,12 +185,19 @@ def parseSignal(t: str, d: datetime = None, p: str = ""):
     hasType = isBuy or isSell
 
     if not hasType:
+        sell = parseSignal("SELL " + t, d, p)
+        if sell:
+            return sell
+        buy = parseSignal("BUY " + t, d, p)
+        if buy:
+            return buy
         return Noise("Missing type")
 
     pair = getValidPair(text)
     if not pair:
         return Noise("Missing pair")
     _tokens = text.split(" ")
+
     if isBuy and isSell:
         _type = "BUY" if text.index("BUY") < text.index("SELL") else "SELL"
 
@@ -190,18 +214,24 @@ def parseSignal(t: str, d: datetime = None, p: str = ""):
             return ret1
         elif type(ret2) is Signal and not type(ret1) is Signal:
             return ret2
+        elif not ret1 and not ret2:
+            if _type == "BUY":
+                return parseSignal(text.replace("SELL",""), d, p)
+            else:
+                return parseSignal(text.replace("BUY",""), d, p)
     else:
-        _type = "BUY" if isBuy else "SELL"    
+        _type = "BUY" if isBuy else "SELL"
     _prices = [float(t) for t in _tokens if isPrice(t)]
 
     if len(_prices)<3:
         return Noise("Less than 3 prices")
 
-    valid_setups = find_valid_setups(_prices, _tokens, text, pair, _type, d, p)
+    valid_setups = find_setups(_prices, _tokens, text, pair, _type, d, p)
+
     if type(valid_setups) is Noise:
         return valid_setups
-    elif len(valid_setups) == 0:
-        return None
+    elif type(valid_setups) is list and len(valid_setups) == 0:
+        return Noise("Could not find any valid setup.")
     else:
         if len(valid_setups) == 1:
             assert(type(valid_setups[0]) is Signal)
@@ -230,28 +260,31 @@ def getValidCryptoPair(text : str) -> str:
 
     if len(found_pairs) > 0 and pairs[0] in pairs:
         return found_pairs[0]
-    
+
     return Noise("Missing pair")
 
 def getValidFXPair(text : str) -> str:
     sixletters = [t for t in text.split(" ") if len(t) is 6]
     found_pairs = [p for p in sixletters if p[:3]
-             in currencies and p[-3:] in currencies]
+             in currencies and p[-3:] in currencies or p in pairs]
     if len(found_pairs) > 0 and pairs[0] in pairs:
         return found_pairs[0]
     return Noise("Missing pair")
 
 def getValidPair(text: str) -> str:
-    
+
+    tokens = [t for t in text.split(" ") if t in pairs]
+    if tokens:
+        return tokens[0]
     fx = getValidFXPair(text)
     if fx and type(fx) is str:
         return fx
-    
+
     crypto = getValidCryptoPair(text)
     if crypto:
         return crypto
-    
-    return Noise("Missing pair") 
+
+    return Noise("Missing pair")
 
 def isPrice(t: str) -> bool:
     try:
@@ -259,7 +292,7 @@ def isPrice(t: str) -> bool:
     except ValueError:
         return False
 
-def getPriceFollowing(tokens : list, prevtoken : str, likely_prices : list, fallback_index : int = 0) -> float:
+def getPriceFollowing(tokens : list, prevtoken : str, likely_prices : list, fallback_index : int = 0, exclude=[]) -> float:
 
     if isPrice(prevtoken):
         replacements = [(t,float(t)) for t in tokens if isPrice(t) and str(float(t)) != t]
@@ -276,16 +309,16 @@ def getPriceFollowing(tokens : list, prevtoken : str, likely_prices : list, fall
         i = fallback_index
     if i < len(tokens):
         if len(likely_prices) == 0:
-            nextPrices = [float(t) for t in tokens[i+1:] if isPrice(t)]
+            nextPrices = [float(t) for t in tokens[i+1:] if isPrice(t) and not float(t) in exclude]
         else:
-            nextPrices = [float(t) for t in tokens[i+1:] if isPrice(t) and float(t) in likely_prices]
-        ret = nextPrices[0] if len(nextPrices) > 0 else 0.0
+            nextPrices = [float(t) for t in tokens[i+1:] if isPrice(t) and float(t) in likely_prices and not float(t) in exclude]
+        ret = nextPrices[0] if len(nextPrices) > 0 and not nextPrices[0] in exclude else 0.0
         return ret
     return 0.0
 
 def purifySetup(s : dict) -> dict:
-    if not type(s) is dict:
-        return Noise("Invalid setup.")
+    if not type(s) is dict or not s:
+        return s
     signal = Signal.from_dict(s)
     sanity_signal = signal.is_payout_safe()
     if sanity_signal:
@@ -295,11 +328,16 @@ def purifySetup(s : dict) -> dict:
 
 def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div : int = 1, d: datetime = None) -> dict:
     _prices = [t for t in tokens if isPrice(t)]
-    entry = getPriceFollowing(tokens, pair, likely_prices)
-    # Only one stop loss enabled
-    sl = getPriceFollowing(tokens, "SL", likely_prices)
-    # At least one TP
-    tp = getPriceFollowing(tokens, "TP", likely_prices)
+
+    if "SL" in tokens or "TP" in tokens:
+        # Only one stop loss enabled
+        sl = getPriceFollowing(tokens, "SL", likely_prices)
+        tp = getPriceFollowing(tokens, "TP", likely_prices)
+        entry = getPriceFollowing(tokens, pair, likely_prices, exclude=[sl, tp])
+    else:
+        entry = getPriceFollowing(tokens, pair, likely_prices)
+        sl = getPriceFollowing(tokens, "SL", likely_prices, exclude=[entry])
+        tp = getPriceFollowing(tokens, "TP", likely_prices, exclude=[entry,sl])
 
     if not "BTC" in pair:
         precision = 5
@@ -310,19 +348,17 @@ def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div
         tp = round(tp/div, precision)
         sl = round(sl/div, precision)
         entry = round(entry/div, precision)
-    
+
+    s = {}
     valid_setups = []
     if valid_setup(_type, entry, sl, tp):
         s = { 'entry': entry, 'sl': sl, 'tp': tp, 'pair': pair, 'date': d, 'sign': _type, 'username': '' }
         if purifySetup(s):
             return s
-    if "ENTRY" or 'ENTERED' in tokens:
-        if 'ENTRY' in tokens:
-            entry = getPriceFollowing(tokens, "ENTRY", likely_prices)
-        elif 'ENTERED' in tokens:
-            entry = getPriceFollowing(tokens, "ENTERED", likely_prices)
-        tp = getPriceFollowing(tokens, "TP", likely_prices)
-        sl = getPriceFollowing(tokens, "SL", likely_prices)
+    if "ENTRY" in tokens:
+        entry = getPriceFollowing(tokens, "ENTRY", likely_prices)
+        tp = getPriceFollowing(tokens, "TP", likely_prices, exclude=[entry])
+        sl = getPriceFollowing(tokens, "SL", likely_prices, exclude=[entry, tp])
 
         if div > 1:
             tp = round(tp/div, precision)
@@ -335,9 +371,7 @@ def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div
             return s
 
     if len(likely_prices) == 3 and not ('SL' in tokens and 'TP' in tokens):
-        entry = likely_prices[0]
-        sl = likely_prices[1]
-        tp = likely_prices[2]
+        (entry, sl, tp) = likely_prices
         if valid_setup(_type, entry, sl, tp):
             return { 'entry': entry, 'sl': sl, 'tp': tp }
 
@@ -363,6 +397,10 @@ def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div
 
         valid_combos = [v for v in mapped_combos if v]
         if len(valid_combos) < 1:
+            invalid_comboset = list(set([str(v) for v in mapped_combos if type(v) is Noise]))
+
+            if (len(invalid_comboset) == 1):
+                return Noise(invalid_comboset[0])
             pass
         elif len(valid_combos) == 1:
             #  -- Tiene un setup valido, tratar de obtener los precios
@@ -372,6 +410,9 @@ def getValidSetup(_type : str, pair: str, tokens: list, likely_prices: list, div
             #return getValidSetup(_type, pair, tokens, ps, div, d)
         elif len(valid_combos) >= 1:
             return valid_combos
+
+    if (s and not purifySetup(s)):
+        return purifySetup(s)
     return False
 
 import re
@@ -395,14 +436,18 @@ def normalizeText(t: str) -> str:
     t = re.sub("SELL STOP","SELL",t)
     t = re.sub("SELL LIMIT","SELL",t)
     t = re.sub("BUY STOP","BUY",t)
+    t = re.sub("BOUGHT","BUY",t)
+    t = re.sub("SOLD","SELL",t)
     t = re.sub("BUY LIMIT","BUY",t)
     t = re.sub("LONG","BUY",t)
     t = re.sub("(SELL|BUY) TERM","",t)
+    t = re.sub("ENTER", " ENTRY ", t)
     t = t.replace('💯'," ")
     t = t.replace('#'," ")
     #t = t.replace('$'," ")
     t = t.replace('S-L'," SL ")
     t = t.replace('T-P'," TP ")
+    t = t.replace("TARGET", "TP")
     t = t.replace('-'," ")
     t = t.replace('@',' ')
     for p in pairs:
@@ -418,19 +463,20 @@ def normalizeText(t: str) -> str:
         if len(matches) > 0:
             t = re.sub(regex,"\\g<1>\\g<2>",t)
             break
-    t = re.sub("(\\d),(\\d)","\\g<1>.\\g<2>",t) # fix numbers
+    t = re.sub(" (\\d),(\\d) ","\\g<1>.\\g<2>",t) # fix numbers
     t = re.sub("_"," _ ",t)
     t = re.sub("TG","TP",t)
     t = re.sub("SL"," SL ",t)
     t = re.sub("TP"," TP ",t)
-    
+
     t = re.sub(" \\.(\\d+)"," \\g<1> ", t)
     t = re.sub("\\s+\\.","",t)
     t = re.sub("(\\.\\.)+"," ",t)
     t = re.sub("T\\.P"," TP ",t)
     t = re.sub("S\\.L"," SL ",t)
-    
-    
+    t = re.sub("TP\\."," TP ",t)
+    t = re.sub("SL\\."," SL ",t)
+
     t = re.sub("STOP LOSS"," SL ",t)
     t = re.sub("STOP"," SL ",t)
     if not 'SL' in t:
@@ -439,6 +485,7 @@ def normalizeText(t: str) -> str:
     t = re.sub("TARGET"," TP ",t)
     t = re.sub("TAKE PROFIT"," TP ",t)
     t = re.sub("(\\d+) PIPS"," ", t) #TODO: Support relative pips parsing
+    t = re.sub("(\\d+)\\.(\\d+)\\.(\\d+)","\\g<1> \\g<2>.\\g<3>",t)
     t = re.sub("((\\d+)\\.(\\d+))"," \\g<1> ", t)
     t = re.sub("((\\d+)\\.(\\s+))"," ", t)
     t = re.sub("SELL"," SELL ", t)
@@ -452,5 +499,7 @@ def normalizeText(t: str) -> str:
     t = re.sub("TP\\s+2\\s+"," TP ",t)
     t = re.sub("TP\\s+3\\s+"," TP ",t)
     t = re.sub('GOLD','XAUUSD',t)
+    t = re.sub('DOW',' US30USD ',t)
+    t = re.sub(' DJ ',' US30USD ',t)
 
     return t

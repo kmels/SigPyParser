@@ -1,4 +1,5 @@
 import unittest
+import pytest
 from datetime import datetime
 
 from signal_parser import *
@@ -7,11 +8,21 @@ from signal_parser.parser import *
 
 today = datetime.now().replace(second=0).replace(microsecond=0)
 
+MISSING_SETUP = Noise("Could not find any valid setup.")
+
+UNSAFE_SL = lambda pips: Noise("Unsafe SL: %.1f pips" % pips)
+UNSAFE_ODDS = lambda odds: Noise("Unsafe payout: %.1f odds" % odds)
 def _parseSignal(t: str):
     return parseSignal(t,today,'p')
 
 class TestFXParser(unittest.TestCase):
 
+    def pp(self,s):
+        if type(s) is Signal:
+            return s['unique_rep']
+        elif type(s) is SignalList:
+            return str([s['unique_rep'] for s in s])
+        return str(s)
     def _testParser(self, text,expected):
         parsedSignal = _parseSignal(text)
 
@@ -19,8 +30,8 @@ class TestFXParser(unittest.TestCase):
             self.assertEqual(
                 parsedSignal,
                 expected,
-                "\n\tEXPECTED: " + str(expected) + ".\n\tRESULT:   " +
-                str(parsedSignal)
+                "\n\tEXPECTED: " + self.pp(expected) + ".\n\tRESULT:   " +
+                self.pp(parsedSignal)
             )
         else:
             assert(type(expected) == SignalList)
@@ -44,7 +55,7 @@ class TestFXParser(unittest.TestCase):
                 "\n\tEXPECTED: " + str(expected[1]['unique_rep']) + ".\n\tRESULT:   " +
                 str(parsedSignal[1]['unique_rep'])
             )
-            
+
             expectedTakeProfits = sorted(expected, key=lambda s: s['tp'])
             parsedSignalTakeProfits = sorted(parsedSignal, key=lambda s: s['tp'])
 
@@ -65,6 +76,20 @@ class TestFXParser(unittest.TestCase):
                 "\n\tEXPECTED: " + str(expected) + ".\n\tRESULT:   " +
                 str(parsedSignal)
             )
+
+    def _testCanonicalParser(self, text, expected):
+        parsedSignal = _parseSignal(text)
+
+        if type(parsedSignal) is Signal or type(parsedSignal) is SignalList:
+            parsedSignal = parsedSignal.canonical()
+            self.assertEqual(
+                parsedSignal,
+                expected,
+                "\n\tEXPECTED: " + str(expected) + ".\n\tRESULT:   " +
+                str(parsedSignal)
+            )
+        else:
+            return self._testParser(text, expected)
 
     def test_1(self):
         self.assertEqual(
@@ -382,7 +407,7 @@ sl : 50 pip
 tp1 : 100 pip
 tp 2 : 180 pip
 
-@mql5signal""", None)
+@mql5signal""", MISSING_SETUP)
 
     def test_31(self):
         self._testParser("""Sell eur/jpy @ 132.950
@@ -433,7 +458,7 @@ We move the stop loss to 1248. This way we reduce our risk to 65 pips.""", Noise
     def test_38(self):
         self._testParser("""Eurusd Sell Now  1.07940
 Sl 1.08550
-Tp 0.0700""", None)
+Tp 0.0700""", UNSAFE_ODDS(168.2))
 
     def test_39(self):
         sig1 = Signal(144.11, 144.61, 143.61, today, "SELL", "p", "GBPJPY")
@@ -461,9 +486,10 @@ SL:1.2434""", Signal(1.2505,1.2434,1.2566,today,"BUY","p","USDCAD"))
     def test_42(self):
         sig1 = Signal(132.65, 133.5, 131.85, today, "SELL", "p", "EURJPY")
         sig2 = Signal(132.65, 133.5, 131.000, today, "SELL", "p", "EURJPY")
+        expected = SignalList([sig1,sig2])
         self._testParser("""EURJPY Sell @132.650,133.000
 TP:131.850,131.000
-SL:133.500""", SignalList([sig1,sig2]))
+SL:133.500""", expected)
 
     def test_43(self):
         sig1 = Signal(1.68015,1.67432,1.68321, today,"BUY","p","GBPAUD")
@@ -498,7 +524,7 @@ S.l
 Sell Gbpnzd at cmp 1.7610
 Tp1 1.7517
 Tp2 1.7419
-Sl 1 7786💴💴💴💴💴💵💵💵""", None)
+Sl 1 7786💴💴💴💴💴💵💵💵""", MISSING_SETUP)
 
     def test_46(self):
         sig1 = Signal(1.7610, 1.7786, 1.7517, today, "SELL", "p", "GBPNZD")
@@ -604,12 +630,12 @@ S.L: @1.2770/$ (30 pip)""", Signal(1.2735, 1.277, 1.267, today,"SELL","p","GBPUS
 👉 TP SET 110 (300 PIP)
 👉SL SET~~~~~~~~
 
-🌹FOREX MINISTER 🌹""", None)
+🌹FOREX MINISTER 🌹""", MISSING_SETUP)
 
     def test_59(self):
         self._testParser("""
         USDJPY::\nbullish but is possible to retest 105.70-85 targeting 108.00-111.10 , you can buy it from this area with sL 50 pips or ( if a daily candle close under this zone)
-        """, None)
+        """, MISSING_SETUP)
 
     def test_60(self):
         self._testParser("""long term signal AUDCHF sell now 0.7525
@@ -623,7 +649,7 @@ EURUSD bearish fib idea - daily timeframe
 Sell limit: [Enter when market opens]
 Stop: 1.17787
 Target 1: 1.14553 [Risk to reward ratio 2.18]
-Target 2: 1.12987 [Risk to reward ratio 3.72]""", None)
+Target 2: 1.12987 [Risk to reward ratio 3.72]""", UNSAFE_SL(10021.3))
 
     def test_62(self):
         self._testParser("""🌹FOREX MINISTER 🌹
@@ -650,7 +676,7 @@ Target 2: 1.12987 [Risk to reward ratio 3.72]""", None)
 👉 TP SET 1.50000(500 pip)
 👉SL SET~~~~~~~~
 
-🌹FOREX MINISTER 🌹""", None)
+🌹FOREX MINISTER 🌹""", MISSING_SETUP)
 
     #def test_63(self):
     #    self._testParser("""BUY BTCUSD 7000 TP 8000 SL 6800""", Signal(7000,8000,6800,today,"BUY","p","BTCUSD"))
@@ -788,7 +814,7 @@ Buy Usd/Jpy @ 113.18
 Tp - 114.02 & 114.85
 Sl - ???
 
-Support around 113.10""", None)
+Support around 113.10""", UNSAFE_SL(8))
 
     def _untested_79(self):
         self._testParser("""*Tycoon Capital Trading And Investment Club*
@@ -836,7 +862,7 @@ TP @ 133.825(60 PIP)""", Signal(133.225, 133.0, 133.825, today,"BUY","p","EURJPY
 :small_orange_diamond:stop loss @ 112.24
 :large_blue_diamond: take profit@ 111.80
 lot size: 0.01 at 500 usd
-SIGNAL NO:27""", None) # take profit is above sell
+SIGNAL NO:27""", MISSING_SETUP) # take profit is above sell (111.80 > 111.76)
 
     def test_85(self):
         self._testParser("""Signal no.5
@@ -982,7 +1008,7 @@ TAKE PROFIT 0.70000""", Signal(0.647, 0.64, 0.7, today, "BUY", "p", "NZDUSD"))
 🌷🎓Waves ScoUt Forex🎓🌷
 At :73.94
 SL :73.76**Risk**15Pip
-        TP :76.01**Reward**205pip🎯""", None) # "Unsafe SL: 1800.0 pips"
+        TP :76.01**Reward**205pip🎯""", UNSAFE_SL(1800)) # "Unsafe SL: 1800.0 pips" (tested below with decimal point corrected)
 
         self._testParser("""📠 Signal Number :16
 
@@ -1059,7 +1085,7 @@ All Copyrights© Reserved""", Signal(1280, 1290, 1270, today, "SELL", "p", "XAUU
     def test_112(self):
         self._testParser("""Eur/aud @ Sell Now 1.63260
 Take Profit: 20-50-100 Pips
-Stop Loss:- 45Pips""", None);
+Stop Loss:- 45Pips""", MISSING_SETUP) #  -- Should pass when absolute pips is supported
 
     def test_113(self):
         sig1 = Signal(1.7025, 1.7085, 1.6990, today, "SELL", "p", "GBPCAD")
@@ -1085,13 +1111,22 @@ St 76.69 (50pips)
 
 Hit tp1 +25pips :man_dancing::dancer:""", SignalList([sig1,sig2,sig3]))
 
-    # Sorry - this one should return 3, not 1.
     def disabled_test_115(self):
-        self._testParser("""#USDCHF Buy @ :point_down::point_down:
+
+        sig1 = Signal(0.9802, 0.97, 0.9820, today, "BUY", "p", "USDCHF")
+        sig2 = Signal(0.9770, 0.97, 0.9795, today, "BUY", "p", "USDCHF")
+        sig3 = Signal(0.9720, 0.97, 0.975, today, "BUY", "p", "USDCHF")
+
+        parse_result = _parseSignal("""#USDCHF Buy @ :point_down::point_down:
 Buy1 @ 0.98020 Tp @ 0.98200
 Buy 2 @0.97700  Tp @ 0.97950
 Buy 3 @0.97200  Tp @ 0.97500
-SL @ 0.97000""", Signal(0.9802, 0.97, 0.9820, today, "BUY", "p", "USDCHF"))
+SL @ 0.97000""")
+
+        error_msg = "%s not in %s " % (self.pp(sig1), self.pp(parse_result))
+        assert sig1 in parse_result, error_msg
+        error_msg = "%s not in %s " % (self.pp(sig3), self.pp(parse_result))
+        assert sig3 in parse_result, error_msg
 
     def test_116(self):
         self._testParser("""📊 Instant Order 📊
@@ -1133,7 +1168,7 @@ All Copyrights Reserved®""", Noise("Missing pair")) #Signal(1293, 1296, 1285, t
 
 2% Risk Per Trade 👨🏻‍💻
 OMID AFGHAN FOREX
-All CopyRight © Reserved""", None)
+All CopyRight © Reserved""", MISSING_SETUP)
 
     def test_121(self):
         self._testParser("""SELL USDJPY 109.44
@@ -1165,6 +1200,233 @@ Support around 138.55📣📣""", SignalList([sig1,sig2]))
         self.assertEqual(parsed.canonical(), expected)
         self._testParser(t, expected)
 
+    def test_124(self):
+        sig1 = Signal(0.9015, 0.8985, 0.9064, today, "BUY", "p", "EURGBP")
+        sig2 = Signal(0.9015, 0.8985, 0.9118, today, "BUY", "p", "EURGBP")
+
+        canonical_sig = Signal(0.9015, 0.8985, [0.9064, 0.9118], today, "BUY", "p", "EURGBP")
+        self._testParser("""#234
+EURGBP (DAYTRADE)📈
+BOUGHT @ 0.9015
+✅TP 1 0.9064
+✅TP 2 0.9118
+🚫SL 0.8985
+
+⏰TIME: 1 TO 3 DAYS
+📊R-R: 1-2.1
+📍RECOMMENDED RISK: 1.00%""", SignalList([sig1,sig2]))
+
+        self._testCanonicalParser("""#234
+EURGBP (DAYTRADE)📈
+BOUGHT @ 0.9015
+✅TP 1 0.9064
+✅TP 2 0.9118
+🚫SL 0.8985
+
+⏰TIME: 1 TO 3 DAYS
+📊R-R: 1-2.1
+📍RECOMMENDED RISK: 1.00%""", canonical_sig)
+
+    def test_125(self):
+        self._testCanonicalParser("""USDMXN BUY @ 22.24000
+
+SL @ 22.12000
+
+TP1 @ 22.36000
+
+TP2 @ 22.48000
+
+TP3 @ 22.60000""", Signal(22.24, 22.12, [22.36, 22.48, 22.60], today, "BUY", "p", "USDMXN"))
+
+    def test_126(self):
+        txt = """SELL EURUSD 1.1274
+SL 1.1370
+TP 1.1156
+TP 1.0946
+TP 1.0750"""
+
+        self._testCanonicalParser(txt, Signal(1.1274, 1.1370, [1.1156, 1.0946, 1.0750], today, "SELL", "p", "EURUSD"))
+
+    def test_127(self):
+        s = _parseSignal("SELL EURUSD 1.1370 SL 1.1370 TP 1.1156")
+        self.assertTrue(type(s) is Noise)
+
+        import pytest
+        with pytest.raises(Exception):
+            s2 = Signal(1.1370, 1.1370, [1.1156], today, "SELL", "p", "EURUSD")
+
+    def test_128(self):
+        txt1 = """CADCHF SELL 2H Chart
+SL:  0.68629
+TP:  0.67760
+PRICE WE ENTERED AT: 0.68425"""
+        txt2 = """GBPCAD 15m Chart
+SL:  1.72982
+TP:  1.73770
+PRICE WE ENTERED AT: 1.73228"""
+        txt3 = """LIMIT ENTRY
+USDJPY SELL 1H Chart
+SL:  105.322
+TP:  104.206
+LIMIT ENTRY: 105.108"""
+
+        parsed = _parseSignal(txt1)
+        self._testParser(txt1, Signal(0.68425, 0.68629, 0.6776, today, "SELL", "p", "CADCHF"))
+        self._testParser(txt2, Signal(1.73228, 1.72982, 1.73770, today, "BUY", "p", "GBPCAD"))
+        self._testParser(txt3, Signal(105.108, 105.322, 104.206, today, "SELL", "p", "USDJPY"))
+
+    def test_129(self):
+        txt = """Buy usdzar
+Tp 17.80
+Sl. 17.10
+Use 0.01 lot size or risk management"""
+
+
+    def test_130(self):
+        txt = """#USDCHF Buy 0.91500
+🔻 0.91000
+🔹 0.92350
+🔹 0.93850"""
+
+        #self._testCanonicalParser(txt, Signal(0.91500, 0.91000, [0.92350,0.93850], today, "BUY", "p", "USDCHF"))
+
+    def test_131(self):
+        txt = """#AUDNZD Sell 1.09700
+🔻 1.10500
+🔹 1.08900
+🔹 1.08300"""
+
+        self._testCanonicalParser(txt, Signal(1.0970, 1.1050, [1.0890, 1.0830], today, "SELL", "p", "AUDNZD"))
+
+        txt = """#AUDUSD Sell 0.72450
+🔻 0.72800
+🔹 0.71950
+🔹 0.70950"""
+
+        self._testCanonicalParser(txt, Signal(0.72450, 0.72800, [0.71950, 0.70950], today, "SELL", "p", "AUDUSD"))
+
+
+        txt = """#USDCAD Buy 1.31550
+🔻 1.31100
+🔹 1.32250
+🔹 1.33400"""
+
+        self._testCanonicalParser(txt, Signal(1.31550, 1.31100, [1.32250, 1.33400], today, "BUY", "p", "USDCAD"))
+
+
+        txt = """#NZDCHF Buy 0.59550
+🔻 0.59000
+🔹 0.59900
+🔹 0.60900"""
+
+        self._testCanonicalParser(txt, Signal(0.59550, 0.59000, [0.59900, 0.60900], today, "BUY", "p", "NZDCHF"))
+
+
+        txt = """#GBPUSD Sell 1.32500
+🔻 1.33700
+🔹 1.30200
+🔹 1.21000"""
+
+        self._testCanonicalParser(txt, Signal(1.32500, 1.33700, [1.30200, 1.21000], today, "SELL", "p", "GBPUSD"))
+
+
+    def test_132(self):
+
+        txt = """sell usdjpy now at 105.70
+sl..106.31
+tp..105.43
+tp2.. 105.11"""
+
+        self._testCanonicalParser(txt, Signal(105.7, 106.31, [105.43, 105.11], today, "SELL", "p", "USDJPY"))
+
+    #@pytest.mark.skip(reason="no way of currently parsing this")
+    def test_133(self):
+        txt = """Dow Jones buy@27779
+
+Tp@27987.46
+
+Tp@28181.32
+
+Tp@28400.25
+
+Sl@27367.60"""
+
+        txt2 = """36. DJ buy limit 27200 -27150 Tp 27700-28150 sl 26950"""
+
+        self._testCanonicalParser(txt, Signal(27779, 27367.60, [27987.46, 28181.32, 28400.25], today, "BUY", "p", "US30USD"))
+
+        self._testCanonicalParser(txt2, Signal(27200, 26950, [27700,28150], today, "BUY", "p", "US30USD"))
+
+    @pytest.mark.skip(reason="no way of currently parsing this")
+    def test_134(self):
+        txt = """Sell nzdjpy 69.975
+🪐Sl 30 pips
+🪐TP 60pips"""
+
+        self._testCanonicalParser(txt, Signal(69.975, 70.275, 69.375, today, "SELL", "p", "NZDJPY"))
+
+    def test_135(self):
+        txt = """#USDCHF Buy 0.91500 🔻 0.91000 🔹 0.92350 🔹 0.93850"""
+
+        self._testCanonicalParser(txt, Signal(0.9150, 0.91, [0.9235, 0.9385], today, "BUY", "p", "USDCHF"))
+
+        txt = """#GBPJPY Sell 139.400 🔻 140.400 🔹 135.900 🔹 131.800"""
+
+        self._testCanonicalParser(txt, Signal(139.400, 140.400, [135.900, 131.800], today, "SELL", "p", "GBPJPY"))
+
+    def test_136(self):
+        txt = """GBPNZD BUY1.96300
+Tp1.1.96600
+Tp2.1.96950
+Tp3.1.97300
+Sl.   1.95800"""
+
+        self._testCanonicalParser(txt, Signal(1.96300, 1.9580, [1.96600, 1.96950, 1.97300], today, "BUY", "p", "GBPNZD"))
+
+        txt = """GBPUSD Buy 1.31500
+Tp1.1.31800
+Tp2.1.32200
+Tp3.1.32800
+SL   1.29600"""
+
+        self._testCanonicalParser(txt, Signal(1.31500, 1.29600, [1.31800, 1.32200, 1.32800], today, "BUY", "p", "GBPUSD"))
+
+    def test_137(self):
+        txt = """📉 SELL XTIUSD at 58.50
+Stop Loss 58.99
+Take Profit 1 at 58.20
+Take Profit 2 at 50.00
+APPROPRIATE LOT SIZE 2% risk"""
+
+        self._testCanonicalParser(txt, Signal(58.50, 58.99, [58.20, 50.00], today, "SELL", "p", "XTIUSD"))
+
+    def disable_test_138(self):
+
+        txt1 = """BUY STOP = 1546.37
+TP 1 : 1547.37
+TP 2 : 1548.37
+TP 3 : 1549.37
+SL : 1543.37"""
+
+        txt2 = """SELL STOP = 1534.92
+TP 1 : 1533.92
+TP 2 : 1532.92
+TP 3 : 1531.92
+SL : 1537.92"""
+
+        buyStop = Signal(1546.37, 1543.37, [1547.37, 1548.37, 1549.37], today, "BUY", "p", "XAUUSD")
+        sellStop = Signal(1534.92, 1537.92, [1533.92, 1532.92, 1531.92], today, "SELL", "p", "XAUUSD")
+
+        self._testCanonicalParser("GOLD " + txt1, buyStop)
+        self._testCanonicalParser("GOLD " + txt2, sellStop)
+
+        sigs = _parseSignal("GOLD " + txt1 + " " + txt2)
+        assert len(sigs) == 2
+        sigs_reps = [s['unique_rep'] for s in sigs]
+        error_msg = "%s not in %s " % (buyStop['unique_rep'], sigs_reps)
+        assert buyStop['unique_rep'] in sigs_reps
+        assert sellStop in sigs_reps
+
     def test_212(self):
         self._testParser("""Gbpjpy sell now 142.000
 Sl 143.000
@@ -1177,7 +1439,7 @@ Tp 1290""", Signal(142.0, 143.0, 140.0, today, "SELL", "p", "GBPJPY"))
     def test_213(self):
         s1 = Signal(1.2685, 1.2605, 1.28, today, "BUY", "p", "GBPCHF")
         s2 = Signal(1.2685, 1.2605, 1.29, today, "BUY", "p", "GBPCHF")
-        self._testParser("Gbpchf buy 1.26850 Sl 1.26050 Tp 1.28000 Tp 1.29000", 
+        self._testParser("Gbpchf buy 1.26850 Sl 1.26050 Tp 1.28000 Tp 1.29000",
             SignalList([s1,s2])
         )
 
@@ -1210,7 +1472,7 @@ SL : 1665.73 #Gold"""
         buy1 = Signal(1668.73, 1665.73, 1669.73, today, "BUY", "p", "XAUUSD")
         buy2 = Signal(1668.73, 1665.73, 1670.73, today, "BUY", "p", "XAUUSD")
         buy3 = Signal(1668.73, 1665.73, 1671.73, today, "BUY", "p", "XAUUSD")
-        
+
         expected = SignalList([buy1, buy2, buy3])
         self._testParser(text1, expected)
         expected = expected.canonical()
@@ -1226,9 +1488,9 @@ SL : 1660.38 XAUUSD
         sell1 = Signal(1657.38, 1660.38, 1656.38, today, "SELL", "p", "XAUUSD")
         sell2 = Signal(1657.38, 1660.38, 1655.38, today, "SELL", "p", "XAUUSD")
         sell3 = Signal(1657.38, 1660.38, 1654.38, today, "SELL", "p", "XAUUSD")
-        
+
         self._testParser(text2, SignalList([sell1, sell2, sell3]))
-        
+
         expected = SignalList([buy1, buy2, buy3, sell1, sell2, sell3])
         self._testParser(text, expected)
 
@@ -1260,7 +1522,7 @@ Tp,@15.900"""
 🔹TP 112.000
 🔺SL 114.310
 ©Copyright Reserved"""
-        self._testParser(text, None)
+        self._testParser(text, MISSING_SETUP)
 
     def test_218(self):
         text = """SELL 0.6433 nzdusd tp 0.6265 SL 0.6530"""
@@ -1323,6 +1585,7 @@ TP 4 1324
 SL 1265
 """, SignalList([signal1, signal2, signal3, signal4]))
 
+
     def test_224(self):
         t = "BUY AUDUSD AT 0.5980 STOP 0.5820 TP 0.6057 TP 0.637 TP 0.69"
         expected1 = Signal(0.5980, 0.5820, 0.6057, today, "BUY", "p", "AUDUSD")
@@ -1331,6 +1594,29 @@ SL 1265
 
         expected = SignalList([expected1, expected2, expected3])
         self._testParser(t, expected)
+
+    def _test_224(self):
+
+        msg = """2019.12.06 09:07 XAUUSD BUY 1475.73300 SL 1471.59100 TP 1479.27800
+
+2020.04.24 06:08 GBPUSD SELL 1.23280 SL 1.23880 TP 1.23080
+
+2020.04.28 07:19 USDCAD SELL 1.40560 SL 1.41160 TP 1.40260
+
+2020.04.30 02:50 USDJPY BUY 106.69000 SL 105.80000 TP 108.00000
+
+2020.04.23 05:27 GBPNZD SELL 2.07170 SL 2.08070 TP 2.06970
+
+2020.04.30 02:53 AUDCAD SELL 0.90790 SL 0.91700 TP 0.89000"""
+
+        parsed = parseSignal(msg)
+
+        print(parsed)
+
+        print(parsed.canonical())
+
+        self.assertEqual([1.4,1.9], parsed.canonical())
+
 #    def test_213(self):
 #        self._testParser("""1). Short GBPJPY
 #@144.250
@@ -1344,7 +1630,7 @@ SL 1265
 
     def test_225(self):
         t = """GBPNZD📉SELL @2.0717
-TP1 2.0697🎯 20 PIPS 
+TP1 2.0697🎯 20 PIPS
 TP2 2.0667🎯 50 PIPS
 TP3 2.0617🎯100 PIPS
 SL❗️ 2.0807"""
@@ -1352,20 +1638,20 @@ SL❗️ 2.0807"""
         expected1 = Signal(2.0717, 2.0807, 2.0697, today, "SELL", "p", "GBPNZD")
         expected2 = Signal(2.0717, 2.0807, 2.0667, today, "SELL", "p", "GBPNZD")
         expected3 = Signal(2.0717, 2.0807, 2.0617, today, "SELL", "p", "GBPNZD")
-        
+
         expected = SignalList([expected1, expected2, expected3])
-        
+
         parsedSignal = _parseSignal(t)
 
         self.assertEqual(parsedSignal[0]['mt4_rep'], expected1['mt4_rep'])
         self._testParser(t, expected)
-        
+
         canonical = expected.canonical()
         self.assertEqual([2.0697, 2.0667, 2.0617], canonical['tp'])
         self.assertEqual([0.2, 0.6, 1.1], canonical['odds'])
         self.assertEqual([20, 50, 100], canonical['tp_pips'])
 
-    def test_226(self):
+    def todo_test_226(self):
         t = """XAGUSD SELL || 15.260
 Sl - 15.460
 Tp - 15.160
@@ -1382,7 +1668,7 @@ Use Money Management"""
         self.assertEqual(expected_tp2.sl_pips(), 20)
         self.assertEqual(expected_tp1.tp_pips(), 10)
         self.assertEqual(expected_tp2.tp_pips(), 26)
-        
+
         expected = SignalList([expected_tp1, expected_tp2])
         self._testParser(t, expected)
 
@@ -1390,7 +1676,7 @@ Use Money Management"""
         self.assertEqual(expected_canonical['odds'], expected.canonical()['odds'])
         self.assertEqual(expected.canonical(), expected_canonical)
 
-    def test_227(self):
+    def todo_test_227(self):
         t = """GBPNZD SELL 5 CHART
 SL:  2.04297
 TP: 2.03879
