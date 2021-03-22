@@ -28,6 +28,8 @@ def has_consensus(_vs):
 
 #  -- Consensus by tie (same event cardinality)
 def has_weak_consensus(_vs):
+    if 0 == len(_vs):
+        return False
     vs = cardinality(_vs)
     _freq = lambda ys, y: len([yi for yi in ys if yi == y])
     _freqs = [(_freq(_vs, v)) for v in _vs]
