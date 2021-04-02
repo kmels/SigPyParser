@@ -17,6 +17,9 @@ def track_record_of_selection(signals):
     last_closed_trade = None
     roi = 0
     pips = 0
+    won_pips = []
+    lost_pips = []
+    won_payoffs = []
 
     nsignals = len(signals)
     nclosed = 0
@@ -85,26 +88,34 @@ def track_record_of_selection(signals):
                 roi -= risk
                 print(signal)
 
-                pips -= mkpips(signal['entry'] - signal['sl'], signal['pair'])
+                sl_pips = mkpips(signal['entry'] - signal['sl'], signal['pair'])
                 positive_streak = 0
                 negative_streak += 1
                 roi_since_high_watermark -= risk
                 pain += risk
                 if negative_streak > max_consecutive_losses:
                     max_consecutive_losses = negative_streak
+                
+                lost_pips.append(sl_pips)
+                pips -= sl_pips
+
             if win:
                 payoff_ = signal['tp_pips'] / signal['sl_pips']
+
                 if type(signal['tp']) is list:
                     fact = len(signal['tp'])
 
                 roi += risk/fact*payoff_
+                normalized_payoff = payoff_/fact
+
                 nwins += 1 / fact
                 geometric_winratio = geometric_winratio * (1 + risk/fact)
 
                 if type(signal['tp']) is list:
+                    
+                    tp_pips = mkpips(signal['entry'] - signal['tp'][0], signal['pair'])
 
-                    pips += mkpips(signal['entry'] - signal['tp'][0], signal['pair'])
-
+                    breakeven_flag = False
                     if len(closed_score.get('secondary_scores',[])) != len(signal['tp']):
                         print("MISSING SECONDARY SCORES ")
 
@@ -114,13 +125,15 @@ def track_record_of_selection(signals):
                             continue
                         #nclosed += 1
                         if ssc['event'] == 'sl_hit':
-                            nbreakevens += 1
+                            breakeven_flag = i + 1
+
                         if ssc['event'] == 'tp_hit':
                             if not 'tp_pips' in ssc['signal']:
                                 print("MISSING TP PIPS: ", ssc)
 
                             #pips += ssc['signal'].get('tp_pips',0)
-                            pips += mkpips(signal['entry'] - signal['tp'][i+1], signal['pair'])
+                            tp_pips += mkpips(signal['tp'][i+1] - signal['tp'][i], signal['pair'])
+
                             nwins += 1 / fact
                             positive_streak += 1
                             payoff_ = ssc['signal']['tp_pips'] / ssc['signal']['sl_pips']
@@ -129,16 +142,20 @@ def track_record_of_selection(signals):
                             roi_since_high_watermark += risk/fact*payoff_
                             roi_since_high_watermark += risk/fact*payoff_
                             geometric_winratio = geometric_winratio * (1 + risk/fact)
-
+                    
                 else:
-                    pips += mkpips(signal['entry'] - signal['tp'], signal['pair'])
+                    tp_pips = mkpips(signal['entry'] - signal['tp'], signal['pair'])
 
-                payoff_ = signal['tp_pips'] / signal['sl_pips']
+                pips += tp_pips
+                won_pips.append(tp_pips)
+
+                payoff_ = tp_pips / signal['sl_pips']
+                won_payoffs.append(payoff_)
 
                 positive_streak += 1
                 negative_streak = 0
-                roi_since_high_watermark += risk/fact*payoff_
-                gain += risk/fact*payoff_
+                roi_since_high_watermark += risk*payoff_
+                gain += risk*payoff_
 
                 if positive_streak > max_consecutive_wins:
                     max_consecutive_wins = positive_streak
@@ -173,6 +190,11 @@ def track_record_of_selection(signals):
             avgpayout = np.array([signal_payout(s['signal']['odds']) for s in signals]).mean()
         else:
             avgpayout = -1
+
+    def calc_avg(xs):
+        if 0 == len(xs):
+            return -1
+        return np.array(xs).mean()
 
     ms = (datetime.now()-init).total_seconds()*1000
     #logging.debug("Processed in %.1f ms" % (ms))
@@ -210,6 +232,10 @@ def track_record_of_selection(signals):
         "process_time_in_ms": ms,
         'roi': round(roi*100,2),
         'pips': round(pips,1),
+        'avg_won_pips': round(calc_avg(won_pips),1),
+        'avg_lost_pips': round(calc_avg(lost_pips),1),
+        'avg_wonpayout': round(calc_avg(won_payoffs),1),
+        'avg_lostpayout': risk,
         'winratio': float("%.2f" % winratio),
         "geometric_winratio": geo_expected_win,
 

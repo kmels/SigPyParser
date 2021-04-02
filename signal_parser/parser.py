@@ -10,7 +10,7 @@ from signal_parser import *
 valid_buy = lambda t, entry, sl, tp: t is "BUY" and entry > sl and tp > entry
 valid_sell = lambda t, entry, sl, tp: t is "SELL" and entry < sl and tp < entry
 
-currencies = ['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU', 'WTI', 'BTC', 'ZAR', 'MXN']
+currencies = ['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU', 'XAG', 'WTI', 'BTC', 'ZAR', 'MXN']
 pairs = [a+b for a in currencies[:-3] for b in currencies[:-3] if a is not b]
 pairs.extend(['WTIUSD','XTIUSD','XAUUSD','US30USD'])
 
@@ -499,6 +499,7 @@ def normalizeText(t: str) -> str:
     t = re.sub("TP\\s+2\\s+"," TP ",t)
     t = re.sub("TP\\s+3\\s+"," TP ",t)
     t = re.sub('GOLD','XAUUSD',t)
+    t = re.sub('SILVER','XAGUSD',t)
     t = re.sub('DOW',' US30USD ',t)
     t = re.sub(' DJ ',' US30USD ',t)
 

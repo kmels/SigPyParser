@@ -118,7 +118,7 @@ class Signal(dict):
             sl_pips /= 100
         if all([not p in self['pair'] for p in ['JPY', 'XAU', 'XTI', 'BTC', 'US30']]):
             sl_pips *= 100
-        if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN']]):
+        if any([p in self['pair'] for p in ['BTC', 'ZAR', 'MXN', 'XAG']]):
             sl_pips /= 100
         return round(sl_pips, 1)
 

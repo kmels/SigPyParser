@@ -1651,7 +1651,7 @@ SL❗️ 2.0807"""
         self.assertEqual([0.2, 0.6, 1.1], canonical['odds'])
         self.assertEqual([20, 50, 100], canonical['tp_pips'])
 
-    def todo_test_226(self):
+    def test_226(self):
         t = """XAGUSD SELL || 15.260
 Sl - 15.460
 Tp - 15.160
@@ -1676,7 +1676,7 @@ Use Money Management"""
         self.assertEqual(expected_canonical['odds'], expected.canonical()['odds'])
         self.assertEqual(expected.canonical(), expected_canonical)
 
-    def todo_test_227(self):
+    def test_227(self):
         t = """GBPNZD SELL 5 CHART
 SL:  2.04297
 TP: 2.03879
